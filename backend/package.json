@@ -1,0 +1,32 @@
+{
+  "name": "loto-ai-pro-backend",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=22 <23" },
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "jest --runInBand",
+    "lint": "eslint .",
+    "test:core-ia": "node --test core-ia/tests"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.1.2",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3"
+  },
+  "optionalDependencies": {
+    "@sparticuz/chromium": "^123.0.1",
+    "puppeteer-core": "^22.15.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^9.9.0"
+  }
+}

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: loto-ai-pro-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: "production"
+      - key: CACHE_TTL_SECONDS
+        value: "120"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: ADMIN_API_KEY
+        sync: false # Render te pide este valor a mano en el dashboard (Settings > Environment) — nunca se guarda en el repositorio ni en este archivo. Genera un valor largo y aleatorio y guárdalo en un lugar seguro; lo necesitarás para llamar a /api/sync y /api/debug.

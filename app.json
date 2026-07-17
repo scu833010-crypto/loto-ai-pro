@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "LOTO IA RD",
+    "slug": "loto-ia-rd",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A1E3F",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lotoiard.app"
+    },
+    "android": {
+      "package": "com.lotoiard.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A1E3F"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
