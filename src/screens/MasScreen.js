@@ -13,6 +13,7 @@ const OPCIONES = [
   { id: "CentroEstadisticas", icon: "analytics-outline", titulo: "Centro de Estadísticas", subtitulo: "Ranking, tendencia, palés y tríos por lotería" },
   { id: "Calendario", icon: "calendar-outline", titulo: "Calendario", subtitulo: "Sorteos del día, pendientes y realizados" },
   { id: "Administracion", icon: "shield-checkmark-outline", titulo: "Administración", subtitulo: "Corrección de resultados con auditoría" },
+  { id: "Prestamos", icon: "lock-closed-outline", titulo: "Préstamos", subtitulo: "Contabilidad privada — acceso solo con PIN" },
 ];
 
 /**

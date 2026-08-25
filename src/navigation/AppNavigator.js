@@ -18,6 +18,7 @@ import InversionesScreen from "../screens/InversionesScreen";
 import ReportesScreen from "../screens/ReportesScreen";
 import AdministracionScreen from "../screens/AdministracionScreen";
 import CalendarioScreen from "../screens/CalendarioScreen";
+import PrestamosScreen from "../screens/PrestamosScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -69,6 +70,7 @@ function MasStack() {
       <Stack.Screen name="Reportes" component={ReportesScreen} options={{ title: "Reportes" }} />
       <Stack.Screen name="Administracion" component={AdministracionScreen} options={{ title: "Administración" }} />
       <Stack.Screen name="Calendario" component={CalendarioScreen} options={{ title: "Calendario de sorteos" }} />
+      <Stack.Screen name="Prestamos" component={PrestamosScreen} options={{ title: "Préstamos" }} />
     </Stack.Navigator>
   );
 }

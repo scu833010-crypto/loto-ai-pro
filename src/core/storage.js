@@ -13,6 +13,7 @@ const KEYS = {
   CORRECCIONES: "@lotoanalytics/correcciones",
   AUDIT_LOG: "@lotoanalytics/auditLog",
   FAVORITOS: "@lotoanalytics/loteriasFavoritas",
+  PRESTAMOS: "@lotoanalytics/prestamos",
 };
 
 async function getJSON(key, fallback) {
@@ -125,4 +126,31 @@ export const FavoritosStore = {
   },
 };
 
-export default { CombinacionesStore, InversionesStore, CorreccionesStore, AuditLogStore, FavoritosStore };
+// ---- Préstamos (módulo privado de contabilidad personal) ----
+// Acceso restringido por PIN en PrestamosScreen — estos datos son solo
+// para quien lleva la contabilidad, no para el resto de los usuarios de
+// la app. Todo préstamo nuevo arranca con montoPagado 0 y estado
+// "pendiente" (registrado, pero aún sin abonar nada).
+export const PrestamosStore = {
+  listar: () => getJSON(KEYS.PRESTAMOS, []),
+  guardar: async (prestamo) => {
+    const actuales = await getJSON(KEYS.PRESTAMOS, []);
+    const nuevas = [prestamo, ...actuales];
+    await setJSON(KEYS.PRESTAMOS, nuevas);
+    return nuevas;
+  },
+  actualizar: async (id, cambios) => {
+    const actuales = await getJSON(KEYS.PRESTAMOS, []);
+    const nuevas = actuales.map((p) => (p.id === id ? { ...p, ...cambios } : p));
+    await setJSON(KEYS.PRESTAMOS, nuevas);
+    return nuevas;
+  },
+  eliminar: async (id) => {
+    const actuales = await getJSON(KEYS.PRESTAMOS, []);
+    const nuevas = actuales.filter((p) => p.id !== id);
+    await setJSON(KEYS.PRESTAMOS, nuevas);
+    return nuevas;
+  },
+};
+
+export default { CombinacionesStore, InversionesStore, CorreccionesStore, AuditLogStore, FavoritosStore, PrestamosStore };
