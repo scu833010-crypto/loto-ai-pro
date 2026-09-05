@@ -12,6 +12,14 @@ import GoldButton from "../components/GoldButton";
 // Seguridad). Este módulo es contabilidad privada de quien tiene el PIN —
 // ningún otro usuario de la app puede ver ni entrar aquí.
 
+// Redondea a centavos antes de comparar/guardar montos — evita que el
+// error de punto flotante (p.ej. 0.1 + 0.2) rechace un abono que paga
+// exactamente el saldo mostrado en pantalla, o deje un préstamo
+// atascado sin poder llegar nunca a "pagado".
+function redondear(valor) {
+  return Math.round(valor * 100) / 100;
+}
+
 function calcularEstado(monto, montoPagado) {
   if (montoPagado <= 0) return "pendiente";
   if (montoPagado >= monto) return "pagado";
@@ -71,7 +79,7 @@ export default function PrestamosScreen() {
     const nuevo = {
       id: `prestamo-${Date.now()}`,
       deudor: deudor.trim(),
-      monto: montoNum,
+      monto: redondear(montoNum),
       montoPagado: 0,
       estado: "pendiente",
       nota: nota.trim(),
@@ -90,8 +98,8 @@ export default function PrestamosScreen() {
   }
 
   async function registrarAbono(item) {
-    const abonoNum = parseFloat(montoAbono);
-    const saldoPendiente = item.monto - item.montoPagado;
+    const abonoNum = redondear(parseFloat(montoAbono));
+    const saldoPendiente = redondear(item.monto - item.montoPagado);
     if (!abonoNum || abonoNum <= 0) {
       Alert.alert("Monto inválido", "Ingresa un abono mayor a 0.");
       return;
@@ -100,7 +108,7 @@ export default function PrestamosScreen() {
       Alert.alert("Abono muy alto", `El saldo pendiente es RD$ ${saldoPendiente.toFixed(2)}.`);
       return;
     }
-    const nuevoMontoPagado = item.montoPagado + abonoNum;
+    const nuevoMontoPagado = redondear(item.montoPagado + abonoNum);
     const actualizados = await PrestamosStore.actualizar(item.id, {
       montoPagado: nuevoMontoPagado,
       estado: calcularEstado(item.monto, nuevoMontoPagado),
@@ -203,7 +211,7 @@ export default function PrestamosScreen() {
         </View>
       }
       renderItem={({ item }) => {
-        const saldoPendiente = item.monto - item.montoPagado;
+        const saldoPendiente = redondear(item.monto - item.montoPagado);
         return (
           <View style={[styles.card, shadow.card]}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
