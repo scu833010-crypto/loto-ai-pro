@@ -27,16 +27,44 @@ Todo se guarda en el navegador (`localStorage`), así que:
 
 Cada préstamo tiene una tasa de interés simple por período (semanal,
 quincenal o mensual, según elijas). El interés se calcula sobre el capital
-que queda pendiente, proporcional a los días transcurridos desde el último
-abono (o desde el inicio, si no hay abonos todavía).
+que queda pendiente: cada vez que se completa un período completo sin
+abono, se le suma su interés (la "cuota" de ese período, como en el
+esquema de interés-solo-sobre-saldo típico de préstamos informales).
 
-Cuando registras un abono, primero se descuenta del interés acumulado, y lo
-que sobra reduce el capital — igual que en la mayoría de préstamos
-informales entre personas.
+Cuando registras un abono, se aplica en este orden: primero a la **mora**
+acumulada (si hay), luego al **interés** acumulado, y lo que sobra reduce
+el **capital** — igual que en la mayoría de préstamos informales entre
+personas.
+
+**Mora por atraso**: si defines un % de mora al crear o editar el
+préstamo, se calcula automáticamente cuando un período vence sin que haya
+un abono que lo cubra — es un % sobre el interés de ese período, aplicado
+una sola vez por período vencido (no se repite cada día).
+
+**Préstamo adicional**: si a alguien que ya tenía saldo pendiente le
+prestas más dinero, usa el botón **"Préstamo adicional"** en su tarjeta en
+vez de crear un préstamo nuevo. El monto se suma al capital pendiente
+desde la fecha que indiques, manteniendo la misma tasa, frecuencia y fecha
+de inicio original — todo queda en un solo registro por persona.
 
 Si necesitas otro tipo de cálculo (por ejemplo cuotas fijas tipo bancario,
 con tabla de amortización), es un cambio en `calcularEstado()` dentro de
 `app.js` — dilo y se ajusta.
+
+## Caja: cuánto dinero ha entrado realmente
+
+Además del resumen de "lo que falta por cobrar", hay una sección **"Caja:
+dinero que realmente ha entrado"** que suma, entre todos los préstamos:
+
+- **Capital prestado (total histórico)**: todo lo que se ha prestado en
+  total, incluyendo adicionales.
+- **Capital recuperado**: la parte de los abonos que efectivamente redujo
+  capital (no cuenta lo que se fue en interés o mora).
+- **Interés + mora cobrados**: la parte de los abonos que pagó interés o
+  mora.
+- **Debería haber en caja**: capital recuperado + interés/mora cobrados —
+  es decir, cuánto dinero deberías tener en mano de estos préstamos, sin
+  confundirlo con el saldo que todavía falta por cobrar.
 
 ## Mensajes predeterminados
 

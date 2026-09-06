@@ -51,9 +51,21 @@ function generarId() {
 //
 // Cada préstamo tiene una tasa de interés por período (según su frecuencia
 // de pago: semanal, quincenal o mensual). El interés se acumula sobre el
-// capital que queda pendiente, proporcional a los días transcurridos.
-// Cada abono se aplica primero al interés acumulado, y lo que sobra reduce
-// el capital.
+// capital que queda pendiente, proporcional a los días transcurridos: cada
+// período que se completa sin abono genera su interés (la "cuota" de ese
+// período, en el esquema de interés-solo-sobre-saldo típico de préstamos
+// informales).
+//
+// Si un período se completa por vencido (hoy ya pasó la fecha de esa
+// "cuota") sin que haya un abono que lo cubra, se le aplica una sola vez
+// la mora configurada (% sobre el interés de ese período).
+//
+// Los "adicionales" (dinero extra prestado a alguien que ya tenía saldo)
+// se suman al capital pendiente desde su fecha, sin abrir un préstamo
+// aparte ni cambiar la fecha de inicio original.
+//
+// Cada abono se aplica en este orden: primero a la mora acumulada, luego
+// al interés acumulado, y lo que sobra reduce el capital.
 
 function diasEntre(fechaA, fechaB) {
   const msPorDia = 1000 * 60 * 60 * 24;
@@ -63,36 +75,70 @@ function diasEntre(fechaA, fechaB) {
 function calcularEstado(prestamo, hoy = new Date()) {
   const periodoDias = DIAS_POR_FRECUENCIA[prestamo.frecuenciaPago] || 30;
   const tasa = prestamo.tasaInteres / 100;
+  const moraTasa = (prestamo.moraPorcentaje || 0) / 100;
 
-  const pagosOrdenados = [...(prestamo.pagos || [])].sort(
-    (a, b) => new Date(a.fecha) - new Date(b.fecha)
-  );
+  const eventos = [
+    ...(prestamo.pagos || []).map((ev) => ({ ...ev, tipo: "pago" })),
+    ...(prestamo.adicionales || []).map((ev) => ({ ...ev, tipo: "adicional" })),
+  ].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
   let saldoCapital = prestamo.monto;
   let interesPendiente = 0;
+  let moraAcumulada = 0;
+  let capitalRecuperado = 0;
+  let interesCobrado = 0; // incluye mora ya cobrada
   let fechaUltimoEvento = new Date(prestamo.fechaInicio);
 
-  for (const pago of pagosOrdenados) {
-    const fechaPago = new Date(pago.fecha);
-    const dias = diasEntre(fechaUltimoEvento, fechaPago);
-    interesPendiente += saldoCapital * tasa * (dias / periodoDias);
+  function avanzarHasta(fecha) {
+    const dias = diasEntre(fechaUltimoEvento, fecha);
+    const periodosCompletos = Math.floor(dias / periodoDias);
+    const diasResiduales = dias - periodosCompletos * periodoDias;
 
-    let montoRestante = pago.monto;
-    if (montoRestante <= interesPendiente) {
-      interesPendiente -= montoRestante;
-    } else {
-      montoRestante -= interesPendiente;
-      interesPendiente = 0;
-      saldoCapital = Math.max(0, saldoCapital - montoRestante);
+    for (let i = 0; i < periodosCompletos; i++) {
+      const interesPeriodo = saldoCapital * tasa;
+      interesPendiente += interesPeriodo;
+      if (moraTasa > 0) {
+        moraAcumulada += interesPeriodo * moraTasa;
+      }
     }
-    fechaUltimoEvento = fechaPago;
+    // Interés proporcional del período en curso (todavía no vence, no genera mora).
+    interesPendiente += saldoCapital * tasa * (diasResiduales / periodoDias);
+
+    fechaUltimoEvento = fecha;
   }
 
-  // Interés acumulado desde el último evento (pago o inicio) hasta hoy.
-  const diasHastaHoy = diasEntre(fechaUltimoEvento, hoy);
-  interesPendiente += saldoCapital * tasa * (diasHastaHoy / periodoDias);
+  for (const evento of eventos) {
+    const fechaEvento = new Date(evento.fecha);
+    avanzarHasta(fechaEvento);
 
-  const totalPendiente = saldoCapital + interesPendiente;
+    if (evento.tipo === "adicional") {
+      saldoCapital += evento.monto;
+      continue;
+    }
+
+    // Pago: primero mora, luego interés, luego capital.
+    let montoRestante = evento.monto;
+
+    const aMora = Math.min(montoRestante, moraAcumulada);
+    moraAcumulada -= aMora;
+    interesCobrado += aMora;
+    montoRestante -= aMora;
+
+    const aInteres = Math.min(montoRestante, interesPendiente);
+    interesPendiente -= aInteres;
+    interesCobrado += aInteres;
+    montoRestante -= aInteres;
+
+    const aCapital = Math.min(montoRestante, saldoCapital);
+    saldoCapital -= aCapital;
+    capitalRecuperado += aCapital;
+  }
+
+  avanzarHasta(hoy);
+
+  const totalPendiente = saldoCapital + interesPendiente + moraAcumulada;
+  const capitalPrestado =
+    prestamo.monto + (prestamo.adicionales || []).reduce((acc, a) => acc + a.monto, 0);
 
   const proximoPago = new Date(fechaUltimoEvento);
   proximoPago.setDate(proximoPago.getDate() + periodoDias);
@@ -112,7 +158,11 @@ function calcularEstado(prestamo, hoy = new Date()) {
   return {
     saldoCapital,
     interesPendiente,
+    moraAcumulada,
     totalPendiente,
+    capitalPrestado,
+    capitalRecuperado,
+    interesCobrado,
     proximoPago,
     diasParaVencer,
     diasAtraso,
@@ -157,6 +207,7 @@ function rellenarPlantilla(clave, prestamo, estado, datosExtra = {}) {
     saldo: formatoMoneda(estado.totalPendiente),
     capital: formatoMoneda(estado.saldoCapital),
     interes: formatoMoneda(estado.interesPendiente),
+    mora: formatoMoneda(estado.moraAcumulada),
     dias: datosExtra.dias ?? estado.diasAtraso,
   };
   return plantilla.replace(/\{(\w+)\}/g, (match, clave2) =>
@@ -176,6 +227,7 @@ function linkWhatsApp(telefono, texto) {
 
 const listaEl = document.getElementById("lista-prestamos");
 const resumenEl = document.getElementById("resumen");
+const resumenCajaEl = document.getElementById("resumen-caja");
 const monedaInput = document.getElementById("config-moneda");
 
 function render() {
@@ -189,13 +241,21 @@ function renderResumen() {
   let totalPendiente = 0;
   let vencidos = 0;
   let proximos = 0;
+  let capitalPrestado = 0;
+  let capitalRecuperado = 0;
+  let interesCobrado = 0;
 
   for (const p of prestamos) {
     const estado = calcularEstado(p, hoy);
     totalPendiente += estado.totalPendiente;
+    capitalPrestado += estado.capitalPrestado;
+    capitalRecuperado += estado.capitalRecuperado;
+    interesCobrado += estado.interesCobrado;
     if (estado.estadoPago === "vencido") vencidos++;
     if (estado.estadoPago === "proximo") proximos++;
   }
+
+  const deberiaHaberEnCaja = capitalRecuperado + interesCobrado;
 
   resumenEl.innerHTML = `
     <div class="resumen-item">
@@ -213,6 +273,25 @@ function renderResumen() {
     <div class="resumen-item">
       <span class="resumen-num badge-warn-text">${proximos}</span>
       <span class="resumen-label">Vencen pronto</span>
+    </div>
+  `;
+
+  resumenCajaEl.innerHTML = `
+    <div class="resumen-item">
+      <span class="resumen-num">${formatoMoneda(capitalPrestado)}</span>
+      <span class="resumen-label">Capital prestado (total histórico)</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-num">${formatoMoneda(capitalRecuperado)}</span>
+      <span class="resumen-label">Capital recuperado</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-num">${formatoMoneda(interesCobrado)}</span>
+      <span class="resumen-label">Interés + mora cobrados</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-num badge-ok-text">${formatoMoneda(deberiaHaberEnCaja)}</span>
+      <span class="resumen-label">Debería haber en caja</span>
     </div>
   `;
 }
@@ -247,20 +326,27 @@ function renderLista() {
           <button class="btn-icono btn-eliminar" data-id="${p.id}" title="Eliminar préstamo">✕</button>
         </div>
         <div class="tarjeta-cuerpo">
-          <div class="dato"><span>Capital prestado</span><strong>${formatoMoneda(p.monto)}</strong></div>
+          <div class="dato"><span>Capital prestado (histórico)</span><strong>${formatoMoneda(estado.capitalPrestado)}</strong></div>
           <div class="dato"><span>Capital pendiente</span><strong>${formatoMoneda(estado.saldoCapital)}</strong></div>
           <div class="dato"><span>Interés acumulado</span><strong>${formatoMoneda(estado.interesPendiente)}</strong></div>
+          ${
+            estado.moraAcumulada > 0.01
+              ? `<div class="dato"><span>Mora acumulada</span><strong class="badge-danger-text">${formatoMoneda(estado.moraAcumulada)}</strong></div>`
+              : ""
+          }
           <div class="dato"><span>Total pendiente</span><strong>${formatoMoneda(estado.totalPendiente)}</strong></div>
           <div class="dato"><span>Próximo vencimiento</span><strong>${formatoFecha(estado.proximoPago)}</strong></div>
-          <div class="dato"><span>Tasa / frecuencia</span><strong>${p.tasaInteres}% ${p.frecuenciaPago}</strong></div>
+          <div class="dato"><span>Tasa / frecuencia</span><strong>${p.tasaInteres}% ${p.frecuenciaPago}${p.moraPorcentaje ? ` · mora ${p.moraPorcentaje}%` : ""}</strong></div>
         </div>
         <div class="tarjeta-acciones">
           <button class="btn btn-secundario btn-editar" data-id="${p.id}">Editar</button>
+          <button class="btn btn-secundario btn-adicional" data-id="${p.id}">Préstamo adicional</button>
           <button class="btn btn-secundario btn-abono" data-id="${p.id}">Registrar abono</button>
           <button class="btn btn-secundario btn-recordatorio" data-id="${p.id}">Recordatorio</button>
-          <button class="btn btn-secundario btn-historial" data-id="${p.id}">Historial (${(p.pagos || []).length})</button>
+          <button class="btn btn-secundario btn-historial" data-id="${p.id}">Historial (${(p.pagos || []).length} abono(s), ${(p.adicionales || []).length} adicional(es))</button>
         </div>
         <div class="panel-oculto" id="panel-editar-${p.id}"></div>
+        <div class="panel-oculto" id="panel-adicional-${p.id}"></div>
         <div class="panel-oculto" id="panel-abono-${p.id}"></div>
         <div class="panel-oculto" id="panel-recordatorio-${p.id}"></div>
         <div class="panel-oculto" id="panel-historial-${p.id}"></div>
@@ -288,11 +374,13 @@ document.getElementById("form-nuevo-prestamo").addEventListener("submit", (e) =>
     telefono: form.telefono.value.trim(),
     monto: parseFloat(form.monto.value),
     tasaInteres: parseFloat(form.tasaInteres.value),
+    moraPorcentaje: parseFloat(form.moraPorcentaje.value) || 0,
     frecuenciaPago: form.frecuenciaPago.value,
     fechaInicio: form.fechaInicio.value,
     metodoPago: form.metodoPago.value,
     notas: form.notas.value.trim(),
     pagos: [],
+    adicionales: [],
   };
 
   if (!prestamo.deudor || isNaN(prestamo.monto) || prestamo.monto <= 0) {
@@ -328,6 +416,11 @@ listaEl.addEventListener("click", (e) => {
 
   if (btn.classList.contains("btn-editar")) {
     togglePanelEditar(prestamo);
+    return;
+  }
+
+  if (btn.classList.contains("btn-adicional")) {
+    togglePanelAdicional(prestamo);
     return;
   }
 
@@ -375,6 +468,9 @@ function togglePanelEditar(prestamo) {
       </label>
       <label>Tasa de interés (% por período)
         <input type="number" name="tasaInteres" min="0" step="0.01" value="${prestamo.tasaInteres}" required />
+      </label>
+      <label>Mora por atraso (% sobre el interés del período vencido)
+        <input type="number" name="moraPorcentaje" min="0" step="0.01" value="${prestamo.moraPorcentaje || 0}" />
       </label>
       <label>Frecuencia de pago
         <select name="frecuenciaPago">
@@ -428,11 +524,64 @@ function togglePanelEditar(prestamo) {
     prestamo.telefono = form.telefono.value.trim();
     prestamo.monto = monto;
     prestamo.tasaInteres = tasaInteres;
+    prestamo.moraPorcentaje = parseFloat(form.moraPorcentaje.value) || 0;
     prestamo.frecuenciaPago = form.frecuenciaPago.value;
     prestamo.fechaInicio = form.fechaInicio.value;
     prestamo.metodoPago = form.metodoPago.value;
     prestamo.notas = form.notas.value.trim();
 
+    panel.innerHTML = "";
+    render();
+  });
+}
+
+function togglePanelAdicional(prestamo) {
+  const panelId = `panel-adicional-${prestamo.id}`;
+  const panel = document.getElementById(panelId);
+  if (panel.innerHTML) {
+    cerrarPaneles();
+    return;
+  }
+  cerrarPaneles(panelId);
+
+  const hoyStr = new Date().toISOString().slice(0, 10);
+  panel.innerHTML = `
+    <form class="form-abono">
+      <p class="nota campo-ancho">
+        Este monto se suma al capital pendiente de ${escapeHtml(prestamo.deudor)},
+        mismas cuotas y frecuencia de pago del préstamo original.
+      </p>
+      <label>Monto adicional prestado
+        <input type="number" name="monto" min="0.01" step="0.01" required />
+      </label>
+      <label>Fecha
+        <input type="date" name="fecha" value="${hoyStr}" required />
+      </label>
+      <label>Notas (opcional)
+        <input type="text" name="notas" placeholder="Ej: préstamo adicional del 20/09" />
+      </label>
+      <div class="panel-acciones">
+        <button type="submit" class="btn btn-primario">Guardar adicional</button>
+        <button type="button" class="btn btn-texto btn-cancelar">Cancelar</button>
+      </div>
+    </form>
+  `;
+
+  panel.querySelector(".btn-cancelar").addEventListener("click", () => {
+    panel.innerHTML = "";
+  });
+
+  panel.querySelector("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const monto = parseFloat(e.target.monto.value);
+    const fecha = e.target.fecha.value;
+    const notas = e.target.notas.value.trim();
+    if (isNaN(monto) || monto <= 0) {
+      alert("El monto adicional debe ser mayor a cero.");
+      return;
+    }
+    prestamo.adicionales = prestamo.adicionales || [];
+    prestamo.adicionales.push({ id: generarId(), monto, fecha, notas });
     panel.innerHTML = "";
     render();
   });
@@ -563,38 +712,61 @@ function togglePanelHistorial(prestamo) {
   }
   cerrarPaneles(panelId);
 
-  const pagos = [...(prestamo.pagos || [])].sort(
+  const pagos = [...(prestamo.pagos || [])].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const adicionales = [...(prestamo.adicionales || [])].sort(
     (a, b) => new Date(b.fecha) - new Date(a.fecha)
   );
 
-  if (pagos.length === 0) {
-    panel.innerHTML = `<p class="vacio">Todavía no hay abonos registrados para este préstamo.</p>`;
+  if (pagos.length === 0 && adicionales.length === 0) {
+    panel.innerHTML = `<p class="vacio">Todavía no hay abonos ni adicionales registrados para este préstamo.</p>`;
     return;
   }
 
+  const filasAbonos = pagos
+    .map(
+      (pago) => `
+      <tr>
+        <td>${formatoFecha(pago.fecha)}</td>
+        <td>Abono</td>
+        <td>${formatoMoneda(pago.monto)}</td>
+        <td>${escapeHtml(pago.notas || "")}</td>
+        <td><button class="btn-icono btn-borrar-pago" data-pago="${pago.id}" title="Eliminar abono">✕</button></td>
+      </tr>
+    `
+    )
+    .join("");
+
+  const filasAdicionales = adicionales
+    .map(
+      (ad) => `
+      <tr>
+        <td>${formatoFecha(ad.fecha)}</td>
+        <td>Adicional</td>
+        <td>${formatoMoneda(ad.monto)}</td>
+        <td>${escapeHtml(ad.notas || "")}</td>
+        <td><button class="btn-icono btn-borrar-adicional" data-adicional="${ad.id}" title="Eliminar adicional">✕</button></td>
+      </tr>
+    `
+    )
+    .join("");
+
   panel.innerHTML = `
     <table class="tabla-historial">
-      <thead><tr><th>Fecha</th><th>Monto</th><th>Notas</th><th></th></tr></thead>
-      <tbody>
-        ${pagos
-          .map(
-            (pago) => `
-          <tr>
-            <td>${formatoFecha(pago.fecha)}</td>
-            <td>${formatoMoneda(pago.monto)}</td>
-            <td>${escapeHtml(pago.notas || "")}</td>
-            <td><button class="btn-icono btn-borrar-pago" data-pago="${pago.id}" title="Eliminar abono">✕</button></td>
-          </tr>
-        `
-          )
-          .join("")}
-      </tbody>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Notas</th><th></th></tr></thead>
+      <tbody>${filasAbonos}${filasAdicionales}</tbody>
     </table>
   `;
 
   panel.querySelectorAll(".btn-borrar-pago").forEach((btn) => {
     btn.addEventListener("click", () => {
       prestamo.pagos = prestamo.pagos.filter((pg) => pg.id !== btn.dataset.pago);
+      render();
+    });
+  });
+
+  panel.querySelectorAll(".btn-borrar-adicional").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      prestamo.adicionales = prestamo.adicionales.filter((ad) => ad.id !== btn.dataset.adicional);
       render();
     });
   });

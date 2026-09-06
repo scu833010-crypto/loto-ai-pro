@@ -118,6 +118,13 @@ body {
 
 .badge-danger-text { color: var(--danger); }
 .badge-warn-text { color: var(--warn); }
+.badge-ok-text { color: var(--ok); }
+
+.titulo-seccion {
+  font-size: 15px;
+  color: var(--texto-suave);
+  margin: 0 0 10px;
+}
 
 .form-prestamo {
   display: grid;

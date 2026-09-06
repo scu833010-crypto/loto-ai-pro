@@ -7,9 +7,10 @@
 //   {nombre}   -> nombre del deudor
 //   {monto}    -> monto de la cuota o del abono, con símbolo de moneda
 //   {fecha}    -> fecha relevante (vencimiento o fecha de pago), formato DD/MM/AAAA
-//   {saldo}    -> saldo total pendiente (capital + interés), con símbolo de moneda
+//   {saldo}    -> saldo total pendiente (capital + interés + mora), con símbolo de moneda
 //   {capital}  -> capital que queda pendiente, con símbolo de moneda
 //   {interes}  -> interés acumulado pendiente, con símbolo de moneda
+//   {mora}     -> mora acumulada por atraso, con símbolo de moneda (0 si no aplica)
 //   {dias}     -> días de atraso (solo tiene sentido en el mensaje de vencido)
 //
 // Puedes agregar tus propias plantillas nuevas: solo dales una clave (el
@@ -25,8 +26,9 @@ const MENSAJES_PREDETERMINADOS = {
     "Saldo total pendiente: {saldo}. ¡Gracias!",
 
   recordatorioVencido:
-    "Hola {nombre}, tu pago venció el {fecha} ({dias} día(s) de atraso). " +
-    "Saldo total pendiente: {saldo}. Por favor coordinemos el pago cuando puedas.",
+    "Hola {nombre}, tu pago venció el {fecha} ({dias} día(s) de atraso), " +
+    "generando una mora de {mora}. Saldo total pendiente: {saldo}. " +
+    "Por favor coordinemos el pago cuando puedas.",
 
   confirmacionPago:
     "Hola {nombre}, confirmo que recibí tu pago de {monto} el {fecha}. " +

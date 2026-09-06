@@ -34,6 +34,11 @@
 
     <section class="resumen" id="resumen"></section>
 
+    <section>
+      <h2 class="titulo-seccion">Caja: dinero que realmente ha entrado</h2>
+      <div class="resumen" id="resumen-caja"></div>
+    </section>
+
     <section class="tarjeta">
       <h2>Nuevo préstamo</h2>
       <form id="form-nuevo-prestamo" class="form-prestamo">
@@ -48,6 +53,9 @@
         </label>
         <label>Tasa de interés (% por período)
           <input type="number" name="tasaInteres" min="0" step="0.01" value="0" required />
+        </label>
+        <label>Mora por atraso (% sobre el interés del período vencido)
+          <input type="number" name="moraPorcentaje" min="0" step="0.01" value="0" />
         </label>
         <label>Frecuencia de pago
           <select name="frecuenciaPago">
