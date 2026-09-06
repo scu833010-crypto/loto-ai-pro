@@ -255,10 +255,12 @@ function renderLista() {
           <div class="dato"><span>Tasa / frecuencia</span><strong>${p.tasaInteres}% ${p.frecuenciaPago}</strong></div>
         </div>
         <div class="tarjeta-acciones">
+          <button class="btn btn-secundario btn-editar" data-id="${p.id}">Editar</button>
           <button class="btn btn-secundario btn-abono" data-id="${p.id}">Registrar abono</button>
           <button class="btn btn-secundario btn-recordatorio" data-id="${p.id}">Recordatorio</button>
           <button class="btn btn-secundario btn-historial" data-id="${p.id}">Historial (${(p.pagos || []).length})</button>
         </div>
+        <div class="panel-oculto" id="panel-editar-${p.id}"></div>
         <div class="panel-oculto" id="panel-abono-${p.id}"></div>
         <div class="panel-oculto" id="panel-recordatorio-${p.id}"></div>
         <div class="panel-oculto" id="panel-historial-${p.id}"></div>
@@ -324,6 +326,11 @@ listaEl.addEventListener("click", (e) => {
     return;
   }
 
+  if (btn.classList.contains("btn-editar")) {
+    togglePanelEditar(prestamo);
+    return;
+  }
+
   if (btn.classList.contains("btn-abono")) {
     togglePanelAbono(prestamo);
     return;
@@ -343,6 +350,91 @@ listaEl.addEventListener("click", (e) => {
 function cerrarPaneles(exceptoId) {
   document.querySelectorAll(".panel-oculto").forEach((el) => {
     if (el.id !== exceptoId) el.innerHTML = "";
+  });
+}
+
+function togglePanelEditar(prestamo) {
+  const panelId = `panel-editar-${prestamo.id}`;
+  const panel = document.getElementById(panelId);
+  if (panel.innerHTML) {
+    cerrarPaneles();
+    return;
+  }
+  cerrarPaneles(panelId);
+
+  panel.innerHTML = `
+    <form class="form-prestamo form-editar">
+      <label>Nombre del deudor
+        <input type="text" name="deudor" value="${escapeHtml(prestamo.deudor)}" required />
+      </label>
+      <label>Teléfono (opcional, para WhatsApp)
+        <input type="tel" name="telefono" value="${escapeHtml(prestamo.telefono || "")}" placeholder="8091234567" />
+      </label>
+      <label>Monto prestado (capital original)
+        <input type="number" name="monto" min="0.01" step="0.01" value="${prestamo.monto}" required />
+      </label>
+      <label>Tasa de interés (% por período)
+        <input type="number" name="tasaInteres" min="0" step="0.01" value="${prestamo.tasaInteres}" required />
+      </label>
+      <label>Frecuencia de pago
+        <select name="frecuenciaPago">
+          <option value="semanal" ${prestamo.frecuenciaPago === "semanal" ? "selected" : ""}>Semanal</option>
+          <option value="quincenal" ${prestamo.frecuenciaPago === "quincenal" ? "selected" : ""}>Quincenal</option>
+          <option value="mensual" ${prestamo.frecuenciaPago === "mensual" ? "selected" : ""}>Mensual</option>
+        </select>
+      </label>
+      <label>Fecha de inicio
+        <input type="date" name="fechaInicio" value="${prestamo.fechaInicio}" required />
+      </label>
+      <label>Método de pago acordado
+        <select name="metodoPago">
+          <option value="efectivo" ${prestamo.metodoPago === "efectivo" ? "selected" : ""}>Efectivo</option>
+          <option value="transferencia" ${prestamo.metodoPago === "transferencia" ? "selected" : ""}>Transferencia</option>
+          <option value="deposito" ${prestamo.metodoPago === "deposito" ? "selected" : ""}>Depósito</option>
+          <option value="otro" ${prestamo.metodoPago === "otro" ? "selected" : ""}>Otro</option>
+        </select>
+      </label>
+      <label class="campo-ancho">Notas (opcional)
+        <input type="text" name="notas" value="${escapeHtml(prestamo.notas || "")}" />
+      </label>
+      <div class="campo-ancho panel-acciones">
+        <button type="submit" class="btn btn-primario">Guardar cambios</button>
+        <button type="button" class="btn btn-texto btn-cancelar">Cancelar</button>
+      </div>
+    </form>
+  `;
+
+  panel.querySelector(".btn-cancelar").addEventListener("click", () => {
+    panel.innerHTML = "";
+  });
+
+  panel.querySelector("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const monto = parseFloat(form.monto.value);
+    const tasaInteres = parseFloat(form.tasaInteres.value);
+    const deudor = form.deudor.value.trim();
+
+    if (!deudor || isNaN(monto) || monto <= 0) {
+      alert("Revisa el nombre y el monto del préstamo.");
+      return;
+    }
+    if (isNaN(tasaInteres) || tasaInteres < 0) {
+      alert("La tasa de interés no puede ser negativa.");
+      return;
+    }
+
+    prestamo.deudor = deudor;
+    prestamo.telefono = form.telefono.value.trim();
+    prestamo.monto = monto;
+    prestamo.tasaInteres = tasaInteres;
+    prestamo.frecuenciaPago = form.frecuenciaPago.value;
+    prestamo.fechaInicio = form.fechaInicio.value;
+    prestamo.metodoPago = form.metodoPago.value;
+    prestamo.notas = form.notas.value.trim();
+
+    panel.innerHTML = "";
+    render();
   });
 }
 
