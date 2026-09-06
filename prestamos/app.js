@@ -28,11 +28,12 @@ function guardarPrestamos(prestamos) {
 }
 
 function cargarConfig() {
+  const porDefecto = { moneda: "RD$", capitalInicial: 0, efectivoReal: null };
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    return raw ? JSON.parse(raw) : { moneda: "RD$" };
+    return raw ? { ...porDefecto, ...JSON.parse(raw) } : porDefecto;
   } catch (e) {
-    return { moneda: "RD$" };
+    return porDefecto;
   }
 }
 
@@ -229,6 +230,8 @@ const listaEl = document.getElementById("lista-prestamos");
 const resumenEl = document.getElementById("resumen");
 const resumenCajaEl = document.getElementById("resumen-caja");
 const monedaInput = document.getElementById("config-moneda");
+const capitalInicialInput = document.getElementById("config-capital-inicial");
+const efectivoRealInput = document.getElementById("config-efectivo-real");
 
 function render() {
   guardarPrestamos(prestamos);
@@ -255,8 +258,6 @@ function renderResumen() {
     if (estado.estadoPago === "proximo") proximos++;
   }
 
-  const deberiaHaberEnCaja = capitalRecuperado + interesCobrado;
-
   resumenEl.innerHTML = `
     <div class="resumen-item">
       <span class="resumen-num">${prestamos.length}</span>
@@ -276,23 +277,48 @@ function renderResumen() {
     </div>
   `;
 
+  // Reconciliación: cuánto efectivo debería haber en la cuenta, partiendo del
+  // capital inicial con que empezó el negocio: lo que no está prestado
+  // (capital inicial - capital que todavía está en la calle) más todo el
+  // interés y mora ya cobrados.
+  const capitalPendienteCapital = capitalPrestado - capitalRecuperado;
+  const capitalInicial = config.capitalInicial || 0;
+  const efectivoEsperado = capitalInicial - capitalPendienteCapital + interesCobrado;
+
+  let filaComparacion = "";
+  if (config.efectivoReal !== null && config.efectivoReal !== undefined && config.efectivoReal !== "") {
+    const diferencia = config.efectivoReal - efectivoEsperado;
+    const cuadra = Math.abs(diferencia) < 1;
+    filaComparacion = `
+      <div class="resumen-item">
+        <span class="resumen-num">${formatoMoneda(config.efectivoReal)}</span>
+        <span class="resumen-label">Efectivo real contado</span>
+      </div>
+      <div class="resumen-item">
+        <span class="resumen-num ${cuadra ? "badge-ok-text" : "badge-danger-text"}">${cuadra ? "Cuadra ✓" : formatoMoneda(Math.abs(diferencia))}</span>
+        <span class="resumen-label">${cuadra ? "Diferencia" : diferencia > 0 ? "Sobra respecto a lo esperado" : "Falta respecto a lo esperado"}</span>
+      </div>
+    `;
+  }
+
   resumenCajaEl.innerHTML = `
     <div class="resumen-item">
-      <span class="resumen-num">${formatoMoneda(capitalPrestado)}</span>
-      <span class="resumen-label">Capital prestado (total histórico)</span>
+      <span class="resumen-num">${formatoMoneda(capitalInicial)}</span>
+      <span class="resumen-label">Capital inicial del negocio</span>
     </div>
     <div class="resumen-item">
-      <span class="resumen-num">${formatoMoneda(capitalRecuperado)}</span>
-      <span class="resumen-label">Capital recuperado</span>
+      <span class="resumen-num">${formatoMoneda(capitalPendienteCapital)}</span>
+      <span class="resumen-label">Capital que sigue en la calle</span>
     </div>
     <div class="resumen-item">
       <span class="resumen-num">${formatoMoneda(interesCobrado)}</span>
       <span class="resumen-label">Interés + mora cobrados</span>
     </div>
     <div class="resumen-item">
-      <span class="resumen-num badge-ok-text">${formatoMoneda(deberiaHaberEnCaja)}</span>
-      <span class="resumen-label">Debería haber en caja</span>
+      <span class="resumen-num badge-ok-text">${formatoMoneda(efectivoEsperado)}</span>
+      <span class="resumen-label">Efectivo esperado en caja</span>
     </div>
+    ${filaComparacion}
   `;
 }
 
@@ -772,11 +798,27 @@ function togglePanelHistorial(prestamo) {
   });
 }
 
-// ---------- Configuración (moneda) ----------
+// ---------- Configuración (moneda, capital inicial, efectivo real) ----------
 
 monedaInput.value = config.moneda;
+capitalInicialInput.value = config.capitalInicial || "";
+efectivoRealInput.value = config.efectivoReal ?? "";
+
 monedaInput.addEventListener("change", () => {
   config.moneda = monedaInput.value.trim() || "RD$";
+  guardarConfig(config);
+  render();
+});
+
+capitalInicialInput.addEventListener("change", () => {
+  config.capitalInicial = parseFloat(capitalInicialInput.value) || 0;
+  guardarConfig(config);
+  render();
+});
+
+efectivoRealInput.addEventListener("change", () => {
+  const valor = efectivoRealInput.value.trim();
+  config.efectivoReal = valor === "" ? null : parseFloat(valor);
   guardarConfig(config);
   render();
 });
@@ -809,8 +851,10 @@ document.getElementById("input-importar").addEventListener("change", (e) => {
       )
         return;
       prestamos = datos.prestamos;
-      config = datos.config || config;
+      config = { ...config, ...(datos.config || {}) };
       monedaInput.value = config.moneda;
+      capitalInicialInput.value = config.capitalInicial || "";
+      efectivoRealInput.value = config.efectivoReal ?? "";
       guardarConfig(config);
       render();
     } catch (err) {
