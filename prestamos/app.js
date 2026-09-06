@@ -307,18 +307,32 @@ function renderResumen() {
     `;
   }
 
+  const totalRecaudado = capitalRecuperado + interesCobrado;
+
   resumenCajaEl.innerHTML = `
     <div class="resumen-item">
       <span class="resumen-num">${formatoMoneda(capitalInicial)}</span>
       <span class="resumen-label">Capital inicial del negocio</span>
     </div>
     <div class="resumen-item">
+      <span class="resumen-num">${formatoMoneda(capitalPrestado)}</span>
+      <span class="resumen-label">Total prestado (histórico, todos)</span>
+    </div>
+    <div class="resumen-item">
       <span class="resumen-num">${formatoMoneda(capitalPendienteCapital)}</span>
       <span class="resumen-label">Capital que sigue en la calle</span>
     </div>
     <div class="resumen-item">
+      <span class="resumen-num">${formatoMoneda(capitalRecuperado)}</span>
+      <span class="resumen-label">Capital ya recuperado</span>
+    </div>
+    <div class="resumen-item">
       <span class="resumen-num">${formatoMoneda(interesCobrado)}</span>
       <span class="resumen-label">Interés + mora cobrados</span>
+    </div>
+    <div class="resumen-item">
+      <span class="resumen-num">${formatoMoneda(totalRecaudado)}</span>
+      <span class="resumen-label">Total recaudado (capital + interés)</span>
     </div>
     <div class="resumen-item">
       <span class="resumen-num badge-ok-text">${formatoMoneda(efectivoEsperado)}</span>
