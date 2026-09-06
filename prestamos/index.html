@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro de Préstamos</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="encabezado">
+    <h1>Registro de Préstamos</h1>
+    <p class="subtitulo">Lleva el control de a quién le prestaste, cuánto te deben y cuándo toca cobrar.</p>
+  </header>
+
+  <main class="contenedor">
+    <section class="tarjeta panel-config">
+      <div class="config-fila">
+        <label>Símbolo de moneda
+          <input type="text" id="config-moneda" maxlength="6" />
+        </label>
+        <label>Capital inicial del negocio
+          <input type="number" id="config-capital-inicial" min="0" step="0.01" placeholder="Ej: 100000" />
+        </label>
+        <label>Efectivo real contado (opcional, para comparar)
+          <input type="number" id="config-efectivo-real" min="0" step="0.01" placeholder="Ej: 54900" />
+        </label>
+        <div class="config-acciones">
+          <button id="btn-actualizar-config" class="btn btn-primario">Actualizar</button>
+          <button id="btn-exportar" class="btn btn-secundario">Descargar respaldo (JSON)</button>
+          <label class="btn btn-secundario btn-archivo">
+            Importar respaldo
+            <input type="file" id="input-importar" accept="application/json" hidden />
+          </label>
+        </div>
+      </div>
+      <p class="nota">
+        Todo se guarda en este navegador (localStorage), sin internet ni servidores.
+        Descarga un respaldo de vez en cuando por si cambias de computadora o navegador.
+        El "capital inicial" es con cuánto efectivo empezaste a prestar (ej. 100,000):
+        con eso la app calcula cuánto debería haber en caja ahora mismo y, si le pones
+        tu efectivo real contado, te dice si cuadra o no.
+      </p>
+    </section>
+
+    <section class="resumen" id="resumen"></section>
+
+    <section>
+      <h2 class="titulo-seccion">Caja: cuánto debería haber en la cuenta</h2>
+      <div class="resumen" id="resumen-caja"></div>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Nuevo préstamo</h2>
+      <form id="form-nuevo-prestamo" class="form-prestamo">
+        <label>Nombre del deudor
+          <input type="text" name="deudor" required />
+        </label>
+        <label>Teléfono (opcional, para WhatsApp)
+          <input type="tel" name="telefono" placeholder="8091234567" />
+        </label>
+        <label>Monto prestado
+          <input type="number" name="monto" min="0.01" step="0.01" required />
+        </label>
+        <label>Tasa de interés (% por período)
+          <input type="number" name="tasaInteres" min="0" step="0.01" value="0" required />
+        </label>
+        <label>Mora por atraso (% sobre el interés del período vencido)
+          <input type="number" name="moraPorcentaje" min="0" step="0.01" value="0" />
+        </label>
+        <label>Frecuencia de pago
+          <select name="frecuenciaPago">
+            <option value="semanal">Semanal</option>
+            <option value="quincenal">Quincenal</option>
+            <option value="mensual" selected>Mensual</option>
+          </select>
+        </label>
+        <label>Fecha de inicio
+          <input type="date" name="fechaInicio" />
+        </label>
+        <label>Método de pago acordado
+          <select name="metodoPago">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="deposito">Depósito</option>
+            <option value="otro">Otro</option>
+          </select>
+        </label>
+        <label class="campo-ancho">Notas (opcional)
+          <input type="text" name="notas" placeholder="Ej: préstamo para..." />
+        </label>
+        <div class="campo-ancho">
+          <button type="submit" class="btn btn-primario">Agregar préstamo</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Préstamos</h2>
+      <div id="lista-prestamos" class="lista"></div>
+    </section>
+  </main>
+
+  <script src="mensajes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
