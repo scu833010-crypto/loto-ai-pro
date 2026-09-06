@@ -827,24 +827,23 @@ monedaInput.value = config.moneda;
 capitalInicialInput.value = config.capitalInicial || "";
 efectivoRealInput.value = config.efectivoReal ?? "";
 
-monedaInput.addEventListener("change", () => {
+function aplicarConfiguracion() {
   config.moneda = monedaInput.value.trim() || "RD$";
-  guardarConfig(config);
-  render();
-});
-
-capitalInicialInput.addEventListener("change", () => {
   config.capitalInicial = parseFloat(capitalInicialInput.value) || 0;
+  const valorEfectivo = efectivoRealInput.value.trim();
+  config.efectivoReal = valorEfectivo === "" ? null : parseFloat(valorEfectivo);
   guardarConfig(config);
   render();
-});
+}
 
-efectivoRealInput.addEventListener("change", () => {
-  const valor = efectivoRealInput.value.trim();
-  config.efectivoReal = valor === "" ? null : parseFloat(valor);
-  guardarConfig(config);
-  render();
-});
+// El botón "Actualizar" es la forma confiable de guardar estos campos
+// (en algunos navegadores/celulares el evento "change" no se dispara si no
+// se pierde el foco del campo, así que no basta con depender de eso solo).
+document.getElementById("btn-actualizar-config").addEventListener("click", aplicarConfiguracion);
+
+monedaInput.addEventListener("change", aplicarConfiguracion);
+capitalInicialInput.addEventListener("change", aplicarConfiguracion);
+efectivoRealInput.addEventListener("change", aplicarConfiguracion);
 
 // ---------- Exportar / importar respaldo ----------
 
