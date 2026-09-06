@@ -136,9 +136,12 @@ function calcularEstado(prestamo, hoy = new Date()) {
     interesCobrado += aInteres;
     montoRestante -= aInteres;
 
-    const aCapital = Math.min(montoRestante, saldoCapital);
-    saldoCapital -= aCapital;
-    capitalRecuperado += aCapital;
+    // El resto del pago se cuenta como efectivo recibido aunque supere el
+    // capital pendiente (sobrepago/crédito a favor) — ese dinero sí entró a
+    // la caja, no puede desaparecer del total recaudado. El saldo de capital
+    // del préstamo nunca baja de 0.
+    saldoCapital = Math.max(0, saldoCapital - montoRestante);
+    capitalRecuperado += montoRestante;
   }
 
   avanzarHasta(hoy);
