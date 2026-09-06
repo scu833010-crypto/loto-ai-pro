@@ -95,10 +95,16 @@ function calcularEstado(prestamo, hoy = new Date()) {
     const periodosCompletos = Math.floor(dias / periodoDias);
     const diasResiduales = dias - periodosCompletos * periodoDias;
 
+    // Si el evento cae justo en el día de vencimiento de un período
+    // (diasResiduales === 0), ese último período se está pagando a tiempo y
+    // no debe generar mora — solo los períodos anteriores a ese sí están
+    // realmente vencidos.
+    const periodosConMora = diasResiduales > 0 ? periodosCompletos : Math.max(0, periodosCompletos - 1);
+
     for (let i = 0; i < periodosCompletos; i++) {
       const interesPeriodo = saldoCapital * tasa;
       interesPendiente += interesPeriodo;
-      if (moraTasa > 0) {
+      if (moraTasa > 0 && i < periodosConMora) {
         moraAcumulada += interesPeriodo * moraTasa;
       }
     }
